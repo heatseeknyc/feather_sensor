@@ -1,12 +1,16 @@
-#define TRANSMITTER_WIFI
-// #define TRANSMITTER_2G
-// #define TRANSMITTER_LORA
+// CONFIG ======================================
 
+// Select one of the following:
 
-#include <Adafruit_Sensor.h>
+//#define TRANSMITTER_WIFI
+#define TRANSMITTER_GSM
+
+// =============================================
+
+//#include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include "RTClib.h"
-#include "DHT_U.h"
+#include "DHT.h"
 #include <SD.h>
 
 #ifdef TRANSMITTER_WIFI
@@ -17,16 +21,31 @@
   #define DHT_DATA  PC2
   #define DHT_VCC   PC3         
   #define DHT_GND   PA2
-  #define DHT_TYPE  DHT22
   #define SD_CS     PB4
 
   #define WLAN_SSID   "0048582303"
   #define WLAN_PASS   "6d3924da63"
 #endif
 
+#ifdef TRANSMITTER_GSM
+//  #include <avr/wdt.h>
+//  #include "Adafruit_FONA.h"
+//  #include <SoftwareSerial.h>
+
+  #define DHT_DATA  A2
+  #define DHT_VCC   A1         
+  #define DHT_GND   A4
+  #define SD_CS     10
+  
+  #define FONA_RX  9
+  #define FONA_TX  8
+  #define FONA_RST 4
+#endif
+
+#define DHT_TYPE           DHT22
 #define USER_AGENT_HEADER  "curl/7.45.0"
 #define SERVER             "requestb.in"
-#define PAGE               "/1b6wrxb1"
+#define PAGE               "/1bl66u81"
 #define PORT               80
 #define HUB                "00000000test0001"
 #define CELL               "Test0000cell0007"
@@ -35,8 +54,7 @@
 
 
 RTC_PCF8523 rtc;
-DHT_Unified dht(DHT_DATA, DHT_TYPE);
-DHT dht_util(DHT_DATA, DHT_TYPE);
+DHT dht(DHT_DATA, DHT_TYPE);
 
 #ifdef TRANSMITTER_WIFI
   AdafruitHTTP http;
@@ -44,12 +62,19 @@ DHT dht_util(DHT_DATA, DHT_TYPE);
   volatile bool response_received = false;
 #endif
 
+#ifdef TRANSMITTER_GSM
+//  SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
+//  SoftwareSerial *fonaSerial = &fonaSS;
+
+//  Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
+#endif
+
 
 void setup() {
   watchdog_init();
 
-  Serial.begin(9600); 
-  while (!Serial) { delay(1); }
+  Serial.begin(9600);
+  delay(2000);
   Serial.println("initializing heatseek data logger");
 
   pinMode(DHT_VCC, OUTPUT);
@@ -64,7 +89,7 @@ void setup() {
 
   initialize_rtc();
 
-  dht.begin();
+//  dht.begin();
   
   watchdog_feed();
 }
@@ -86,51 +111,51 @@ void loop() {
 }
 
 void read_temperatures(float *temperature_f, float *humidity, float *heat_index) {
-  while (true) {
-    sensors_event_t event;
-    bool success = true;
-
-    dht.temperature().getEvent(&event);
-    
-    if (!isnan(event.temperature)) {
-      *temperature_f = dht_util.convertCtoF(event.temperature);
-    } else {
-      success = false;
-    }
-    
-    dht.humidity().getEvent(&event);
-
-    if (!isnan(event.temperature)) {
-      *humidity = event.relative_humidity;
-    } else {
-      success = false;
-    }
-    
-    if (success) {  
-      *heat_index = dht_util.computeHeatIndex(*temperature_f, *humidity);
-  
-      Serial.print("Temperature: ");
-      Serial.print(*temperature_f);
-      Serial.println(" *F");
-      
-      Serial.print("Humidity: ");
-      Serial.print(*humidity);
-      Serial.println("%");
-      
-      Serial.print("Heat index: ");
-      Serial.println(*heat_index);
-
-      return;
-      
-    } else {
-      Serial.println("Error reading temperatures!");
-    }
-  
-    delay(2000);
-
-    // if we continue to fail to read a temperature, the watchdog will
-    // eventually cause a reboot
-  }
+//  while (true) {
+//    sensors_event_t event;
+//    bool success = true;
+//
+//    dht.temperature().getEvent(&event);
+//    
+//    if (!isnan(event.temperature)) {
+//      *temperature_f = dht_util.convertCtoF(event.temperature);
+//    } else {
+//      success = false;
+//    }
+//    
+//    dht.humidity().getEvent(&event);
+//
+//    if (!isnan(event.temperature)) {
+//      *humidity = event.relative_humidity;
+//    } else {
+//      success = false;
+//    }
+//    
+//    if (success) {  
+//      *heat_index = dht_util.computeHeatIndex(*temperature_f, *humidity);
+//  
+//      Serial.print("Temperature: ");
+//      Serial.print(*temperature_f);
+//      Serial.println(" *F");
+//      
+//      Serial.print("Humidity: ");
+//      Serial.print(*humidity);
+//      Serial.println("%");
+//      
+//      Serial.print("Heat index: ");
+//      Serial.println(*heat_index);
+//
+//      return;
+//      
+//    } else {
+//      Serial.println("Error reading temperatures!");
+//    }
+//  
+//    delay(2000);
+//
+//    // if we continue to fail to read a temperature, the watchdog will
+//    // eventually cause a reboot
+//  }
 }
 
 void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
@@ -149,78 +174,118 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
   }
 }
 
-void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
-  while (!wifiConnected) { connect_to_wifi(); }
-
-  http.connect(SERVER, PORT); // Will halt if an error occurs
-
-  http.addHeader("User-Agent", USER_AGENT_HEADER);
-  http.addHeader("Connection", "close");
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-  char time_buffer[30];
-  char temperature_buffer[30];
-  char humidity_buffer[30];
-  char heat_index_buffer[30];
-
-  sprintf(time_buffer, "%d", current_time);
-  sprintf(temperature_buffer, "%.3f", temperature_f);
-  sprintf(humidity_buffer, "%.3f", humidity);
-  sprintf(heat_index_buffer, "%.3f", heat_index);
-
-  const char* post_data[][2] =
-  {
-    {"hub", HUB},
-    {"cell", CELL},
-    {"time", time_buffer},
-    {"temp", temperature_buffer},
-    {"humidity", humidity_buffer},
-    {"heat_index", heat_index_buffer}
-  };
-
-  response_received = false;
-
-  http.post(SERVER, PAGE, post_data, 6); // Will halt if an error occurs
-
-  while (!response_received);
-
-  Serial.println("========================");
-}
-
-void receive_callback(void) {
-  http.respParseHeader();
-
-  Serial.printf("transmitted - received status: (%d) \n", http.respStatus());
-  
-  http.stop();
-  response_received = true;
-}
-
-void connect_to_wifi() {
-  Serial.print("Please wait while connecting to: '" WLAN_SSID "' ... ");
-
-  if (Feather.connect(WLAN_SSID, WLAN_PASS)) {
-    Serial.println("Connected!");
-    wifiConnected = true;
-  } else {
-    Serial.printf("Failed! %s (%d) \n", Feather.errstr());
+#ifdef TRANSMITTER_GSM
+  void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
+//    // POST example based on:
+//    // https://github.com/adafruit/Adafruit_FONA/blob/d3d047bf9c47f4f4a2151525d48b5c044daba2e3/Adafruit_FONA.cpp#L1622
+//
+//    connect_to_fona();
+//
+//    if (!fona.enableGPRS(true)) {
+//      Serial.println(F("Failed to turn on"));
+//      while(true);
+//    }
+//
+//    uint16_t statuscode;
+//    int16_t length;
+//    char *url = "requestb.in/1bl66u81";
+//    char *data = "test1=true&test2=false&float=123.3";
+//    
+//    if (!fona.HTTP_POST_start(url, F("text/plain"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length)) {
+//      Serial.println("Failed!");
+//      while(true);
+//    }
+//
+//    if (statuscode != 200) {
+//      Serial.println("status not 200!");
+//    }
+//
+//    fona.HTTP_POST_end();
   }
-  Serial.println();
 
-  if (!Feather.connected()) { return; }
+//  void connect_to_fona() {
+//    fonaSerial->begin(4800);
+//    if (! fona.begin(*fonaSerial)) {
+//      Serial.println(F("Couldn't find FONA"));
+//      while(true); // watchdog will reboot
+//    }
+//  }
+#endif 
 
-  // Connected: Print network info
-  Feather.printNetwork();
+#ifdef TRANSMITTER_WIFI
+  void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
+    while (!wifiConnected) { connect_to_wifi(); }
   
-  // Tell the HTTP client to auto print error codes and halt on errors
-  http.err_actions(true, true);
-
-  // Set HTTP client verbose
-  http.verbose(true);
-
-  // Set the callback handlers
-  http.setReceivedCallback(receive_callback);
-}
+    http.connect(SERVER, PORT); // Will halt if an error occurs
+  
+    http.addHeader("User-Agent", USER_AGENT_HEADER);
+    http.addHeader("Connection", "close");
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+    char time_buffer[30];
+    char temperature_buffer[30];
+    char humidity_buffer[30];
+    char heat_index_buffer[30];
+  
+    sprintf(time_buffer, "%d", current_time);
+    sprintf(temperature_buffer, "%.3f", temperature_f);
+    sprintf(humidity_buffer, "%.3f", humidity);
+    sprintf(heat_index_buffer, "%.3f", heat_index);
+  
+    const char* post_data[][2] =
+    {
+      {"hub", HUB},
+      {"cell", CELL},
+      {"time", time_buffer},
+      {"temp", temperature_buffer},
+      {"humidity", humidity_buffer},
+      {"heat_index", heat_index_buffer}
+    };
+  
+    response_received = false;
+  
+    http.post(SERVER, PAGE, post_data, 6); // Will halt if an error occurs
+  
+    while (!response_received);
+  
+    Serial.println("========================");
+  }
+  
+  void receive_callback(void) {
+    http.respParseHeader();
+  
+    Serial.printf("transmitted - received status: (%d) \n", http.respStatus());
+    
+    http.stop();
+    response_received = true;
+  }
+  
+  void connect_to_wifi() {
+    Serial.print("Please wait while connecting to: '" WLAN_SSID "' ... ");
+  
+    if (Feather.connect(WLAN_SSID, WLAN_PASS)) {
+      Serial.println("Connected!");
+      wifiConnected = true;
+    } else {
+      Serial.printf("Failed! %s (%d) \n", Feather.errstr());
+    }
+    Serial.println();
+  
+    if (!Feather.connected()) { return; }
+  
+    // Connected: Print network info
+    Feather.printNetwork();
+    
+    // Tell the HTTP client to auto print error codes and halt on errors
+    http.err_actions(true, true);
+  
+    // Set HTTP client verbose
+    http.verbose(true);
+  
+    // Set the callback handlers
+    http.setReceivedCallback(receive_callback);
+  }
+#endif
 
 void initialize_rtc() {
   if (!rtc.begin()) {
@@ -258,10 +323,22 @@ void initialize_rtc() {
 }
 
 void watchdog_init() {
-  iwdg_init(IWDG_PRE_256, 1476); // 9 second watchdog, 40kHz processor
+  #ifdef TRANSMITTER_WIFI
+    iwdg_init(IWDG_PRE_256, 1476); // 9 second watchdog, 40kHz processor
+  #endif
+
+  #ifdef TRANSMITTER_GSM
+//    wdt_enable(WDTO_8S);
+  #endif
 }
 
 void watchdog_feed() {
-  iwdg_feed();
+  #ifdef TRANSMITTER_WIFI
+    iwdg_feed();
+  #endif
+  
+  #ifdef TRANSMITTER_GSM
+//    wdt_reset();
+  #endif
 }
 
