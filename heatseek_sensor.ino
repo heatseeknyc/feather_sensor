@@ -49,13 +49,11 @@
 #define HUB                "00000000test0001"
 #define CELL               "Test0000cell0007"
 
-#define READING_INTERVAL_S   (60)
+#define READING_INTERVAL_S   (20 * 60)
 
 
 RTC_PCF8523 rtc;
 SdCard sd_card;
-Fat16 data_file;
-Fat16 last_reading_file;
 DHT dht(DHT_DATA, DHT_TYPE);
 
 #ifdef TRANSMITTER_WIFI
@@ -98,24 +96,21 @@ void loop() {
   float heat_index;
 
   uint32_t current_time = rtc.now().unixtime();
-  Serial.print("current_time: ");
-  Serial.println(current_time);
-//  uint32_t last_reading_time = get_last_reading_time();
-
-//  if (current_time - last_reading_time < READING_INTERVAL_S) {
-//    Serial.print("waiting to take next reading... time since last reading: ");
-//    Serial.print(current_time - last_reading_time);
-//    Serial.print(", current_time: ");
-//    Serial.print(current_time);
-//    Serial.print(", last_reading_time: ");
-//    Serial.print(last_reading_time);
-//    Serial.print(", reading_interval: ");
-//    Serial.println(60000);
-//    delay(1000);
-//    return;
-//  } else {
-//    
-//  }
+  uint32_t last_reading_time = get_last_reading_time();
+  
+  Serial.print("time since last reading: ");
+  Serial.print(current_time - last_reading_time);
+  Serial.print(", current_time: ");
+  Serial.print(current_time);
+  Serial.print(", last_reading_time: ");
+  Serial.print(last_reading_time);
+  Serial.print(", reading_interval: ");
+  Serial.println(READING_INTERVAL_S);
+  
+  if (current_time - last_reading_time < READING_INTERVAL_S) {
+    delay(2000);
+    return;
+  }
   
   read_temperatures(&temperature_f, &humidity, &heat_index);
   log_to_sd(temperature_f, humidity, heat_index, current_time);
@@ -140,15 +135,15 @@ void read_temperatures(float *temperature_f, float *humidity, float *heat_index)
       *heat_index = dht.computeHeatIndex(*temperature_f, *humidity);
   
       Serial.print("Temperature: ");
-      Serial.print(*temperature_f);
-      Serial.println(" *F");
-      
-      Serial.print("Humidity: ");
-      Serial.print(*humidity);
-      Serial.println("%");
-      
-      Serial.print("Heat index: ");
-      Serial.println(*heat_index);
+//      Serial.print(*temperature_f);
+//      Serial.println(" *F");
+//      
+//      Serial.print("Humidity: ");
+//      Serial.print(*humidity);
+//      Serial.println("%");
+//      
+//      Serial.print("Heat index: ");
+//      Serial.println(*heat_index);
 
       return;
       
@@ -165,6 +160,8 @@ void read_temperatures(float *temperature_f, float *humidity, float *heat_index)
 
 void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
   Serial.println("writing to SD card...");
+  
+  Fat16 data_file;
   
   if (data_file.open("data.csv", O_CREAT | O_APPEND | O_WRITE)) {
     data_file.print(current_time); data_file.print(",");
@@ -246,7 +243,7 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
       watchdog_feed();
 
       if (millis() - start > 30000) {
-        Serial.println('failed to start FONA GPRS after 30 sec');
+        Serial.println("failed to start FONA GPRS after 30 sec");
         while (true);
       }
     }
@@ -390,7 +387,7 @@ void watchdog_init() {
   #endif
 
   #ifdef TRANSMITTER_GSM
-//    Watchdog.enable(8000);
+    Watchdog.enable(8000);
   #endif
 }
 
@@ -405,28 +402,32 @@ void watchdog_feed() {
 }
 
 void update_last_reading_time(uint32_t timestamp) {
+  Fat16 last_reading_file;
+  
   if (last_reading_file.open("reading.txt", O_CREAT | O_WRITE)) {
     last_reading_file.print(timestamp);
     last_reading_file.close();
-    Serial.println("updated last reading time");
+//    Serial.println("updated last reading time");
   } else {
-    Serial.println("unable to write last_reading.txt");
+//    Serial.println("unable to write reading.txt");
     while(true); // watchdog will reboot
   }
 }
 
 uint32_t get_last_reading_time() {
+  Fat16 last_reading_file;
   char buf[40];
   int i = 0;
   char c;
   
   if (last_reading_file.open("reading.txt", O_READ)) {
     while ((c = last_reading_file.read()) > 0) {
-      buf[i] = c;
+      buf[i++] = c;
     }
+    buf[i] = '\0';
     last_reading_file.close();
   } else {
-    Serial.println("unable to read reading.csv");
+//    Serial.println("unable to read reading.txt");
     while(true); // watchdog will reboot
   }
   
