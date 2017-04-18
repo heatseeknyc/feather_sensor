@@ -7,11 +7,10 @@
 
 // =============================================
 
-//#include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include "RTClib.h"
 #include "DHT.h"
-#include <SD.h>
+#include "Fat16.h"
 
 #ifdef TRANSMITTER_WIFI
   #include <libmaple/iwdg.h>
@@ -28,9 +27,9 @@
 #endif
 
 #ifdef TRANSMITTER_GSM
-//  #include <avr/wdt.h>
-//  #include "Adafruit_FONA.h"
-//  #include <SoftwareSerial.h>
+  #include "Adafruit_FONA.h"
+  #include <SoftwareSerial.h>
+  #include <Adafruit_SleepyDog.h>
 
   #define DHT_DATA  A2
   #define DHT_VCC   A1         
@@ -50,10 +49,13 @@
 #define HUB                "00000000test0001"
 #define CELL               "Test0000cell0007"
 
-#define READING_DELAY_MS   (2 * 1000)
+#define READING_INTERVAL_S   (60)
 
 
 RTC_PCF8523 rtc;
+SdCard sd_card;
+Fat16 data_file;
+Fat16 last_reading_file;
 DHT dht(DHT_DATA, DHT_TYPE);
 
 #ifdef TRANSMITTER_WIFI
@@ -63,12 +65,12 @@ DHT dht(DHT_DATA, DHT_TYPE);
 #endif
 
 #ifdef TRANSMITTER_GSM
-//  SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
-//  SoftwareSerial *fonaSerial = &fonaSS;
+  SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
+  SoftwareSerial *fonaSerial = &fonaSS;
 
-//  Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
+  Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
+  bool gsmConnected = false;
 #endif
-
 
 void setup() {
   watchdog_init();
@@ -81,15 +83,11 @@ void setup() {
   pinMode(DHT_GND, OUTPUT);
   digitalWrite(DHT_VCC, HIGH);
   digitalWrite(DHT_GND, LOW);
-  
-  if (!SD.begin(SD_CS)) {
-    Serial.println("failed to initialize SD card");
-    while (true); // watchdog will reboot
-  }
 
+  initialize_sd();
   initialize_rtc();
 
-//  dht.begin();
+  dht.begin();
   
   watchdog_feed();
 }
@@ -100,68 +98,75 @@ void loop() {
   float heat_index;
 
   uint32_t current_time = rtc.now().unixtime();
+  Serial.print("current_time: ");
+  Serial.println(current_time);
+//  uint32_t last_reading_time = get_last_reading_time();
+
+//  if (current_time - last_reading_time < READING_INTERVAL_S) {
+//    Serial.print("waiting to take next reading... time since last reading: ");
+//    Serial.print(current_time - last_reading_time);
+//    Serial.print(", current_time: ");
+//    Serial.print(current_time);
+//    Serial.print(", last_reading_time: ");
+//    Serial.print(last_reading_time);
+//    Serial.print(", reading_interval: ");
+//    Serial.println(60000);
+//    delay(1000);
+//    return;
+//  } else {
+//    
+//  }
+  
   read_temperatures(&temperature_f, &humidity, &heat_index);
   log_to_sd(temperature_f, humidity, heat_index, current_time);
+  update_last_reading_time(current_time);
   watchdog_feed();
   
   transmit(temperature_f, humidity, heat_index, current_time);
 
   watchdog_feed();
-  delay(READING_DELAY_MS);
+
+  delay(2000);
 }
 
 void read_temperatures(float *temperature_f, float *humidity, float *heat_index) {
-//  while (true) {
-//    sensors_event_t event;
-//    bool success = true;
-//
-//    dht.temperature().getEvent(&event);
-//    
-//    if (!isnan(event.temperature)) {
-//      *temperature_f = dht_util.convertCtoF(event.temperature);
-//    } else {
-//      success = false;
-//    }
-//    
-//    dht.humidity().getEvent(&event);
-//
-//    if (!isnan(event.temperature)) {
-//      *humidity = event.relative_humidity;
-//    } else {
-//      success = false;
-//    }
-//    
-//    if (success) {  
-//      *heat_index = dht_util.computeHeatIndex(*temperature_f, *humidity);
-//  
-//      Serial.print("Temperature: ");
-//      Serial.print(*temperature_f);
-//      Serial.println(" *F");
-//      
-//      Serial.print("Humidity: ");
-//      Serial.print(*humidity);
-//      Serial.println("%");
-//      
-//      Serial.print("Heat index: ");
-//      Serial.println(*heat_index);
-//
-//      return;
-//      
-//    } else {
-//      Serial.println("Error reading temperatures!");
-//    }
-//  
-//    delay(2000);
-//
-//    // if we continue to fail to read a temperature, the watchdog will
-//    // eventually cause a reboot
-//  }
+  while (true) {
+    bool success = true;
+
+    *temperature_f = dht.readTemperature(true);
+    *humidity = dht.readHumidity();
+    
+    if (!isnan(*temperature_f) && !isnan(*humidity)) {  
+      *heat_index = dht.computeHeatIndex(*temperature_f, *humidity);
+  
+      Serial.print("Temperature: ");
+      Serial.print(*temperature_f);
+      Serial.println(" *F");
+      
+      Serial.print("Humidity: ");
+      Serial.print(*humidity);
+      Serial.println("%");
+      
+      Serial.print("Heat index: ");
+      Serial.println(*heat_index);
+
+      return;
+      
+    } else {
+      Serial.println("Error reading temperatures!");
+    }
+  
+    delay(2000);
+
+    // if we continue to fail to read a temperature, the watchdog will
+    // eventually cause a reboot
+  }
 }
 
 void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
-  File data_file;
+  Serial.println("writing to SD card...");
   
-  if (data_file = SD.open("data.csv", FILE_WRITE)) {
+  if (data_file.open("data.csv", O_CREAT | O_APPEND | O_WRITE)) {
     data_file.print(current_time); data_file.print(",");
     data_file.print(temperature_f); data_file.print(",");
     data_file.print(humidity); data_file.print(",");
@@ -176,40 +181,80 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
 
 #ifdef TRANSMITTER_GSM
   void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
-//    // POST example based on:
-//    // https://github.com/adafruit/Adafruit_FONA/blob/d3d047bf9c47f4f4a2151525d48b5c044daba2e3/Adafruit_FONA.cpp#L1622
-//
-//    connect_to_fona();
-//
-//    if (!fona.enableGPRS(true)) {
-//      Serial.println(F("Failed to turn on"));
-//      while(true);
-//    }
-//
-//    uint16_t statuscode;
-//    int16_t length;
-//    char *url = "requestb.in/1bl66u81";
-//    char *data = "test1=true&test2=false&float=123.3";
-//    
-//    if (!fona.HTTP_POST_start(url, F("text/plain"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length)) {
-//      Serial.println("Failed!");
-//      while(true);
-//    }
-//
-//    if (statuscode != 200) {
-//      Serial.println("status not 200!");
-//    }
-//
-//    fona.HTTP_POST_end();
+    // POST example based on:
+    // https://github.com/adafruit/Adafruit_FONA/blob/d3d047bf9c47f4f4a2151525d48b5c044daba2e3/Adafruit_FONA.cpp#L1622
+
+    if (!gsmConnected) connect_to_fona();
+
+    while (!fona_post(temperature_f, humidity, heat_index, current_time)) {
+      Serial.println("failed to POST, trying again...");
+      delay(500);
+    }
   }
 
-//  void connect_to_fona() {
-//    fonaSerial->begin(4800);
-//    if (! fona.begin(*fonaSerial)) {
-//      Serial.println(F("Couldn't find FONA"));
-//      while(true); // watchdog will reboot
-//    }
-//  }
+  bool fona_post(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
+    fona.HTTP_POST_end();
+              
+    uint16_t statuscode;
+    int16_t length;
+    char *url = "requestb.in/1i65ku31";
+
+    char data[200];
+
+    char temperature_buffer[10];
+    char humidity_buffer[10];
+    char heat_index_buffer[10];
+
+    dtostrf(temperature_f, 4, 3, temperature_buffer);
+    dtostrf(humidity, 4, 3, humidity_buffer);
+    dtostrf(heat_index, 4, 3, heat_index_buffer);
+    
+    sprintf(data, "temp=%s&humidity=%s&heat_index=%s&hub=%s&cell=%s&time=%d", temperature_buffer, humidity_buffer, heat_index_buffer, HUB, CELL, current_time);
+    
+    while (!fona.HTTP_POST_start(url, F("application/x-www-form-urlencoded"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length)) {
+      return false;
+    }
+
+    if (statuscode != 200) {
+      Serial.print("status not 200: ");
+      Serial.println(statuscode);
+      return false;
+    }
+
+    fona.HTTP_POST_end();
+    return true;
+  }
+
+  void connect_to_fona() {
+    Serial.println('starting fona serial');
+    fonaSerial->begin(4800);
+    
+    Serial.println('starting fona serial 2');
+    if (!fona.begin(*fonaSerial)) {
+      Serial.println("Couldn't find FONA");
+      while(true); // watchdog will reboot
+    }
+
+    delay(2000);
+
+    Serial.println('enabling FONA GPRS');
+
+    uint32_t start = millis();
+    
+    while (!fona.enableGPRS(true)) {
+      delay(1000);
+      watchdog_feed();
+
+      if (millis() - start > 30000) {
+        Serial.println('failed to start FONA GPRS after 30 sec');
+        while (true);
+      }
+    }
+    
+    Serial.println("Enabled FONA GRPS");
+
+    gsmConnected = true;
+  }
 #endif 
 
 #ifdef TRANSMITTER_WIFI
@@ -295,30 +340,47 @@ void initialize_rtc() {
   
   if (!rtc.initialized()) {
     Serial.println("RTC is NOT running!");
-    // following line sets the RTC to the date & time this sketch was compiled
     // TODO - this could make a web request to set and continually update the RTC
 
     char timestamp[50];
     int i = 0;
     bool timestamp_input = false;
 
-    Serial.println("RTC needs to be set, enter the current unix timestamp");
-
     while (true) {
-      if (Serial.available()) {
+      Serial.println("RTC needs to be set, enter the current unix timestamp");
+      while (Serial.available()) {
         char c = Serial.read();
         Serial.print("read: ");
         Serial.println(c);
         if (c == '\n') {
           Serial.println("done setting");
+          timestamp_input = true;
           break;
         } else {
           timestamp[i++] = c;
         }
       }
+      if (timestamp_input) break;
+      delay(1000);
     }
+
+    Serial.print("setting timestamp to: ");
+    Serial.println(strtoul(timestamp, NULL, 0));
     
-    rtc.adjust(DateTime(atoi(timestamp)));
+    rtc.adjust(DateTime(strtoul(timestamp, NULL, 0)));
+    update_last_reading_time(0);
+  }
+}
+
+void initialize_sd() {
+  if (!sd_card.begin(SD_CS)) {
+    Serial.println("failed to initialize SD card");
+    while (true); // watchdog will reboot
+  }
+
+  if (!Fat16::init(&sd_card)) {
+    Serial.println("failed to initialize FAT 16");
+    while (true); // watchdog will reboot
   }
 }
 
@@ -328,7 +390,7 @@ void watchdog_init() {
   #endif
 
   #ifdef TRANSMITTER_GSM
-//    wdt_enable(WDTO_8S);
+//    Watchdog.enable(8000);
   #endif
 }
 
@@ -338,7 +400,35 @@ void watchdog_feed() {
   #endif
   
   #ifdef TRANSMITTER_GSM
-//    wdt_reset();
+    Watchdog.reset();
   #endif
 }
 
+void update_last_reading_time(uint32_t timestamp) {
+  if (last_reading_file.open("reading.txt", O_CREAT | O_WRITE)) {
+    last_reading_file.print(timestamp);
+    last_reading_file.close();
+    Serial.println("updated last reading time");
+  } else {
+    Serial.println("unable to write last_reading.txt");
+    while(true); // watchdog will reboot
+  }
+}
+
+uint32_t get_last_reading_time() {
+  char buf[40];
+  int i = 0;
+  char c;
+  
+  if (last_reading_file.open("reading.txt", O_READ)) {
+    while ((c = last_reading_file.read()) > 0) {
+      buf[i] = c;
+    }
+    last_reading_file.close();
+  } else {
+    Serial.println("unable to read reading.csv");
+    while(true); // watchdog will reboot
+  }
+  
+  return (uint32_t)strtoul(buf, NULL, 0);
+}
