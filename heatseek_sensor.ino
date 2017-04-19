@@ -2,15 +2,15 @@
 
 // Select one of the following:
 
-//#define TRANSMITTER_WIFI
-#define TRANSMITTER_GSM
+#define TRANSMITTER_WIFI
+//#define TRANSMITTER_GSM
 
 // =============================================
 
 #include <Wire.h>
 #include "RTClib.h"
 #include "DHT.h"
-#include "Fat16.h"
+#include <SD.h>
 
 #ifdef TRANSMITTER_WIFI
   #include <libmaple/iwdg.h>
@@ -44,16 +44,15 @@
 #define DHT_TYPE           DHT22
 #define USER_AGENT_HEADER  "curl/7.45.0"
 #define SERVER             "requestb.in"
-#define PAGE               "/1bl66u81"
+#define PAGE               "/1haglt01"
 #define PORT               80
 #define HUB                "00000000test0001"
 #define CELL               "Test0000cell0007"
 
-#define READING_INTERVAL_S   (20 * 60)
+#define READING_INTERVAL_S   (5 * 60)
 
 
 RTC_PCF8523 rtc;
-SdCard sd_card;
 DHT dht(DHT_DATA, DHT_TYPE);
 
 #ifdef TRANSMITTER_WIFI
@@ -97,9 +96,10 @@ void loop() {
 
   uint32_t current_time = rtc.now().unixtime();
   uint32_t last_reading_time = get_last_reading_time();
+  uint32_t time_since_last_reading = current_time - last_reading_time;
   
   Serial.print("time since last reading: ");
-  Serial.print(current_time - last_reading_time);
+  Serial.print(time_since_last_reading);
   Serial.print(", current_time: ");
   Serial.print(current_time);
   Serial.print(", last_reading_time: ");
@@ -107,10 +107,13 @@ void loop() {
   Serial.print(", reading_interval: ");
   Serial.println(READING_INTERVAL_S);
   
-  if (current_time - last_reading_time < READING_INTERVAL_S) {
+  if (time_since_last_reading < READING_INTERVAL_S) {
     delay(2000);
+    watchdog_feed();
     return;
   }
+  
+  watchdog_feed();
   
   read_temperatures(&temperature_f, &humidity, &heat_index);
   log_to_sd(temperature_f, humidity, heat_index, current_time);
@@ -135,15 +138,15 @@ void read_temperatures(float *temperature_f, float *humidity, float *heat_index)
       *heat_index = dht.computeHeatIndex(*temperature_f, *humidity);
   
       Serial.print("Temperature: ");
-//      Serial.print(*temperature_f);
-//      Serial.println(" *F");
-//      
-//      Serial.print("Humidity: ");
-//      Serial.print(*humidity);
-//      Serial.println("%");
-//      
-//      Serial.print("Heat index: ");
-//      Serial.println(*heat_index);
+      Serial.print(*temperature_f);
+      Serial.println(" *F");
+      
+      Serial.print("Humidity: ");
+      Serial.print(*humidity);
+      Serial.println("%");
+      
+      Serial.print("Heat index: ");
+      Serial.println(*heat_index);
 
       return;
       
@@ -161,9 +164,9 @@ void read_temperatures(float *temperature_f, float *humidity, float *heat_index)
 void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
   Serial.println("writing to SD card...");
   
-  Fat16 data_file;
+  File data_file;
   
-  if (data_file.open("data.csv", O_CREAT | O_APPEND | O_WRITE)) {
+  if (data_file = SD.open("data.csv", FILE_WRITE)) {
     data_file.print(current_time); data_file.print(",");
     data_file.print(temperature_f); data_file.print(",");
     data_file.print(humidity); data_file.print(",");
@@ -358,6 +361,7 @@ void initialize_rtc() {
         }
       }
       if (timestamp_input) break;
+      watchdog_feed();
       delay(1000);
     }
 
@@ -370,13 +374,8 @@ void initialize_rtc() {
 }
 
 void initialize_sd() {
-  if (!sd_card.begin(SD_CS)) {
+  if (!SD.begin(SD_CS)) {
     Serial.println("failed to initialize SD card");
-    while (true); // watchdog will reboot
-  }
-
-  if (!Fat16::init(&sd_card)) {
-    Serial.println("failed to initialize FAT 16");
     while (true); // watchdog will reboot
   }
 }
@@ -402,34 +401,35 @@ void watchdog_feed() {
 }
 
 void update_last_reading_time(uint32_t timestamp) {
-  Fat16 last_reading_file;
+  File last_reading_file;
   
-  if (last_reading_file.open("reading.txt", O_CREAT | O_WRITE)) {
+  if (last_reading_file = SD.open("reading.txt", O_WRITE | O_CREAT | O_TRUNC)) {
     last_reading_file.print(timestamp);
     last_reading_file.close();
-//    Serial.println("updated last reading time");
+    Serial.println("updated last reading time");
   } else {
-//    Serial.println("unable to write reading.txt");
+    Serial.println("unable to write reading.txt");
     while(true); // watchdog will reboot
   }
 }
 
 uint32_t get_last_reading_time() {
-  Fat16 last_reading_file;
+  File last_reading_file;
   char buf[40];
   int i = 0;
   char c;
-  
-  if (last_reading_file.open("reading.txt", O_READ)) {
-    while ((c = last_reading_file.read()) > 0) {
-      buf[i++] = c;
+
+//  Serial.println("checking reading.txt");
+  if (last_reading_file = SD.open("reading.txt", FILE_READ)) {
+    while (last_reading_file.available()) {
+      buf[i++] = last_reading_file.read();
     }
     buf[i] = '\0';
     last_reading_file.close();
   } else {
-//    Serial.println("unable to read reading.txt");
+    Serial.println("unable to read reading.txt");
     while(true); // watchdog will reboot
   }
-  
+//  Serial.println(" reading.txt done");
   return (uint32_t)strtoul(buf, NULL, 0);
 }
