@@ -1,3 +1,6 @@
+#ifndef TRANSMIT_H
+#define TRANSMIT_H
+
 #ifdef MCU_STM32F205RG
   #define TRANSMITTER_WIFI
 #else
@@ -34,3 +37,5 @@
 #define PORT               80
 
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time);
+
+#endif
