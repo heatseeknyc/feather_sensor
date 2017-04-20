@@ -1,4 +1,5 @@
 #include "watchdog.h"
+#include "transmit.h"
 
 void watchdog_init() {
   #ifdef TRANSMITTER_WIFI

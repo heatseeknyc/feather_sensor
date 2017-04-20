@@ -26,8 +26,6 @@ void rtc_set() {
     Serial.println("Setting RTC, enter the current unix timestamp");
     while (Serial.available()) {
       char c = Serial.read();
-      Serial.print("read: ");
-      Serial.println(c);
       if (c == '\n') {
         Serial.println("done setting");
         timestamp_input = true;
