@@ -8,9 +8,11 @@
 // =============================================
 
 #include <Wire.h>
-#include "RTClib.h"
 #include "DHT.h"
 #include <SD.h>
+#include "config.h"
+#include "watchdog.h"
+#include "rtc.h"
 
 #ifdef TRANSMITTER_WIFI
   #include <libmaple/iwdg.h>
@@ -51,8 +53,6 @@
 
 #define READING_INTERVAL_S   (5 * 60)
 
-
-RTC_PCF8523 rtc;
 DHT dht(DHT_DATA, DHT_TYPE);
 
 #ifdef TRANSMITTER_WIFI
@@ -82,10 +82,12 @@ void setup() {
   digitalWrite(DHT_GND, LOW);
 
   initialize_sd();
-  initialize_rtc();
+  rtc_initialize();
 
   dht.begin();
-  
+
+  if (!read_config()) set_default_config();
+
   watchdog_feed();
 }
 
@@ -95,9 +97,14 @@ void loop() {
   float heat_index;
 
   uint32_t current_time = rtc.now().unixtime();
-  uint32_t last_reading_time = get_last_reading_time();
+  uint32_t last_reading_time = CONFIG.data.last_reading_time;
   uint32_t time_since_last_reading = current_time - last_reading_time;
-  
+
+  char command = Serial.read();
+  if (command == 'C') {
+    enter_configuration();
+  }
+      
   Serial.print("time since last reading: ");
   Serial.print(time_since_last_reading);
   Serial.print(", current_time: ");
@@ -106,6 +113,22 @@ void loop() {
   Serial.print(last_reading_time);
   Serial.print(", reading_interval: ");
   Serial.println(READING_INTERVAL_S);
+
+//  while (true) {
+//    CONFIG.data.version = 1;
+//    CONFIG.data.last_reading_time = last_reading_time;
+//    strcpy(CONFIG.data.hub_id, "00000000test0001");
+//    strcpy(CONFIG.data.cell_id, "Test0000cell0007");
+//    write_config();
+////
+////    read_config();
+////
+////    Serial.println(CONFIG.data.version);
+////    Serial.println(CONFIG.data.hub_id);
+//
+//    delay(1000);
+//    watchdog_feed();
+//  }
   
   if (time_since_last_reading < READING_INTERVAL_S) {
     delay(2000);
@@ -259,6 +282,11 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
 
 #ifdef TRANSMITTER_WIFI
   void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
+    if (!CONFIG.data.cell_configured || !CONFIG.data.wifi_configured || !CONFIG.data.endpoint_configured) {
+      Serial.println("cannot send data - not configured");
+      return;
+    }
+  
     while (!wifiConnected) { connect_to_wifi(); }
   
     http.connect(SERVER, PORT); // Will halt if an error occurs
@@ -332,104 +360,9 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
   }
 #endif
 
-void initialize_rtc() {
-  if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    while (true); // watchdog will reboot
-  }
-  
-  if (!rtc.initialized()) {
-    Serial.println("RTC is NOT running!");
-    // TODO - this could make a web request to set and continually update the RTC
-
-    char timestamp[50];
-    int i = 0;
-    bool timestamp_input = false;
-
-    while (true) {
-      Serial.println("RTC needs to be set, enter the current unix timestamp");
-      while (Serial.available()) {
-        char c = Serial.read();
-        Serial.print("read: ");
-        Serial.println(c);
-        if (c == '\n') {
-          Serial.println("done setting");
-          timestamp_input = true;
-          break;
-        } else {
-          timestamp[i++] = c;
-        }
-      }
-      if (timestamp_input) break;
-      watchdog_feed();
-      delay(1000);
-    }
-
-    Serial.print("setting timestamp to: ");
-    Serial.println(strtoul(timestamp, NULL, 0));
-    
-    rtc.adjust(DateTime(strtoul(timestamp, NULL, 0)));
-    update_last_reading_time(0);
-  }
-}
-
 void initialize_sd() {
   if (!SD.begin(SD_CS)) {
     Serial.println("failed to initialize SD card");
     while (true); // watchdog will reboot
   }
-}
-
-void watchdog_init() {
-  #ifdef TRANSMITTER_WIFI
-    iwdg_init(IWDG_PRE_256, 1476); // 9 second watchdog, 40kHz processor
-  #endif
-
-  #ifdef TRANSMITTER_GSM
-    Watchdog.enable(8000);
-  #endif
-}
-
-void watchdog_feed() {
-  #ifdef TRANSMITTER_WIFI
-    iwdg_feed();
-  #endif
-  
-  #ifdef TRANSMITTER_GSM
-    Watchdog.reset();
-  #endif
-}
-
-void update_last_reading_time(uint32_t timestamp) {
-  File last_reading_file;
-  
-  if (last_reading_file = SD.open("reading.txt", O_WRITE | O_CREAT | O_TRUNC)) {
-    last_reading_file.print(timestamp);
-    last_reading_file.close();
-    Serial.println("updated last reading time");
-  } else {
-    Serial.println("unable to write reading.txt");
-    while(true); // watchdog will reboot
-  }
-}
-
-uint32_t get_last_reading_time() {
-  File last_reading_file;
-  char buf[40];
-  int i = 0;
-  char c;
-
-//  Serial.println("checking reading.txt");
-  if (last_reading_file = SD.open("reading.txt", FILE_READ)) {
-    while (last_reading_file.available()) {
-      buf[i++] = last_reading_file.read();
-    }
-    buf[i] = '\0';
-    last_reading_file.close();
-  } else {
-    Serial.println("unable to read reading.txt");
-    while(true); // watchdog will reboot
-  }
-//  Serial.println(" reading.txt done");
-  return (uint32_t)strtoul(buf, NULL, 0);
 }
