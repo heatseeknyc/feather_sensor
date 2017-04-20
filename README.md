@@ -2,12 +2,12 @@
 
 ## Building Project
 
-## Software
-
 1. Ensure you're on (at least) version 1.6.13 of the Arduino IDE
 1. Unzip libraries file and place the contents in your Arduino user libraries folder.  (Usually `~/Documents/Arduino/libraries`)
 1. Set up WICED Feather using [steps here](https://learn.adafruit.com/introducing-the-adafruit-wiced-feather-wifi/).
 1. Set up M0 Feather using [steps here](https://learn.adafruit.com/adafruit-feather-m0-basic-proto/setup).
+
+## Software
 
 ### Outline
 
