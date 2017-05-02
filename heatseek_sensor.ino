@@ -15,11 +15,6 @@ void setup() {
   delay(2000);
   Serial.println("initializing heatseek data logger");
 
-  pinMode(DHT_VCC, OUTPUT);
-  pinMode(DHT_GND, OUTPUT);
-  digitalWrite(DHT_VCC, HIGH);
-  digitalWrite(DHT_GND, LOW);
-
   initialize_sd();
   rtc_initialize();
 
@@ -51,7 +46,7 @@ void loop() {
   Serial.print(", last_reading_time: ");
   Serial.print(last_reading_time);
   Serial.print(", reading_interval: ");
-  Serial.println(CONFIG.data.reading_interval_s);
+  Serial.print(CONFIG.data.reading_interval_s);
   
   if (time_since_last_reading < CONFIG.data.reading_interval_s) {
     delay(2000);

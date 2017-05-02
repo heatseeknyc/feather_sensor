@@ -7,7 +7,7 @@ void watchdog_init() {
   #endif
 
   #ifdef TRANSMITTER_GSM
-    Watchdog.enable(8000);
+    Watchdog.enable(12000);
   #endif
 }
 

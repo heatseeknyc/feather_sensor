@@ -13,24 +13,16 @@
   #include <adafruit_http.h>
 
   #define DHT_DATA  PC2
-  #define DHT_VCC   PC3         
-  #define DHT_GND   PA2
   #define SD_CS     PB4
 #endif
 
 #ifdef TRANSMITTER_GSM
   #include "Adafruit_FONA.h"
-  #include <SoftwareSerial.h>
   #include <Adafruit_SleepyDog.h>
 
   #define DHT_DATA  A2
-  #define DHT_VCC   A1         
-  #define DHT_GND   A4
   #define SD_CS     10
-  
-  #define FONA_RX  9
-  #define FONA_TX  8
-  #define FONA_RST 4
+  #define FONA_RST  A4
 #endif
 
 #define USER_AGENT_HEADER  "curl/7.45.0"
