@@ -1,11 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_VERSION     3
+#define CONFIG_VERSION     4
 
 typedef struct {
   uint16_t version;
-  uint32_t last_reading_time;
   uint32_t reading_interval_s;
 
   uint8_t cell_configured;
@@ -32,6 +31,7 @@ void write_config();
 bool read_config();
 void set_default_config();
 void enter_configuration();
+uint32_t get_last_reading_time();
 void update_last_reading_time(uint32_t timestamp);
 
 #endif

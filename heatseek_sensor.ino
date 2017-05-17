@@ -31,7 +31,7 @@ void loop() {
   float heat_index;
 
   uint32_t current_time = rtc.now().unixtime();
-  uint32_t last_reading_time = CONFIG.data.last_reading_time;
+  uint32_t last_reading_time = get_last_reading_time();
   uint32_t time_since_last_reading = current_time - last_reading_time;
 
   char command = Serial.read();
@@ -46,7 +46,7 @@ void loop() {
   Serial.print(", last_reading_time: ");
   Serial.print(last_reading_time);
   Serial.print(", reading_interval: ");
-  Serial.print(CONFIG.data.reading_interval_s);
+  Serial.println(CONFIG.data.reading_interval_s);
   
   if (time_since_last_reading < CONFIG.data.reading_interval_s) {
     delay(2000);

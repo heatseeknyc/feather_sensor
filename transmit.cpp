@@ -42,7 +42,7 @@
 
     Serial.print("posting to: "); Serial.println(url);
     Serial.print("with data: "); Serial.println(data);
-    
+
     if (!fona.HTTP_POST_start(url, F("application/x-www-form-urlencoded"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length)) {
       return false;
     }

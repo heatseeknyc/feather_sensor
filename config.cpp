@@ -10,7 +10,7 @@ CONFIG_union CONFIG;
 void write_config() {
   File config_file;
   
-  if (config_file = SD.open("config.bin", O_WRITE | O_CREAT | O_TRUNC)) {
+  if (config_file = SD.open("config.bin", FILE_WRITE | O_TRUNC)) {
     config_file.write(CONFIG.raw, sizeof(CONFIG));
     config_file.close();
   } else {
@@ -27,6 +27,10 @@ bool read_config() {
     int read_size = config_file.read(CONFIG.raw, sizeof(CONFIG));
     
     if (sizeof(CONFIG) == read_size) {
+      Serial.print("Version from file: ");
+      Serial.print(CONFIG.data.version);
+      Serial.print(";  expected version: ");
+      Serial.println(CONFIG_VERSION);
       if (CONFIG.data.version == CONFIG_VERSION) {
         Serial.println("config loaded");
         success = true;
@@ -50,7 +54,6 @@ bool read_config() {
 
 void set_default_config() {
   CONFIG.data.version = CONFIG_VERSION;
-  CONFIG.data.last_reading_time = 0;
   CONFIG.data.reading_interval_s = 5 * 60;
   CONFIG.data.cell_configured = 0;
   CONFIG.data.wifi_configured = 0;
@@ -89,16 +92,16 @@ int read_input_until_newline(char *message, char *buffer) {
 void print_menu() {
   Serial.println("-------------------------------------");
   Serial.println("[?] Print this menu");
-  Serial.println("[c] Set RTC");
+  Serial.println("[t] Set RTC");
   Serial.println("[r] Set reading interval");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
   #endif
   Serial.println("[i] Setup Cell ID");
   Serial.println("[e] Setup API Endpoint");
-  Serial.println("[P] Print config");
-  Serial.println("[R] Reset config");
-  Serial.println("[E] Exit config");
+  Serial.println("[p] Print config");
+  Serial.println("[d] Reset config");
+  Serial.println("[s] Exit config");
 }
 
 void print_config_info() {
@@ -153,7 +156,7 @@ void enter_configuration() {
           print_menu();
           break;
         }
-        case 'c': {
+        case 't': {
           rtc_set();
           print_menu();
           break;
@@ -233,7 +236,7 @@ void enter_configuration() {
           print_menu();
           break;
         }
-        case 'R': {
+        case 'd': {
           Serial.println("reseting config");
           set_default_config();
           write_config();
@@ -242,12 +245,12 @@ void enter_configuration() {
           print_menu();
           break;
         }
-        case 'P': {
+        case 'p': {
           Serial.println("print config info");
           print_config_info();
           break;
         }
-        case 'E': {
+        case 's': {
           Serial.println("exiting config");
           return;
         }
@@ -258,8 +261,38 @@ void enter_configuration() {
   }
 }
 
+uint32_t get_last_reading_time() {
+  File reading_time_file;
+  uint8_t data[4];
+
+  if (reading_time_file = SD.open("time.bin", FILE_READ)) {
+    reading_time_file.read(data, sizeof(data));
+    reading_time_file.close();
+  } else {
+    Serial.println("unable to read last reading time");
+    while(true);
+  }
+
+  return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
+}
+
 void update_last_reading_time(uint32_t timestamp) {
-  CONFIG.data.last_reading_time = timestamp;
-  write_config();
+  uint8_t data[4];
+
+  data[0] = (timestamp & 0x000000ff);
+  data[1] = (timestamp & 0x0000ff00) >> 8;
+  data[2] = (timestamp & 0x00ff0000) >> 16;
+  data[3] = (timestamp & 0xff000000) >> 24;
+
+  File reading_time_file;
+
+  if (reading_time_file = SD.open("time.bin", FILE_WRITE | O_TRUNC)) {
+    reading_time_file.write(data, sizeof(data));
+    reading_time_file.close();
+  } else {
+    Serial.println("unable to update last reading time");
+    while(true); // watchdog will reboot
+  }
+
   Serial.println("updated last reading time");
 }
