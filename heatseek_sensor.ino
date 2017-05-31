@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <DHT.h>
 #include <SD.h>
+#include <SPI.h>
 #include "transmit.h"
 #include "config.h"
 #include "watchdog.h"
@@ -13,7 +14,13 @@ void setup() {
 
   Serial.begin(9600);
   delay(2000);
-  Serial.println("initializing heatseek data logger");
+  
+  Serial.print("initializing heatseek data logger: ");
+  #ifdef TRANSMITTER_WIFI
+    Serial.println("WIFI");
+  #else
+    Serial.println("cellular");
+  #endif
 
   initialize_sd();
   rtc_initialize();
@@ -124,8 +131,12 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
 }
 
 void initialize_sd() {
-  if (!SD.begin(SD_CS)) {
+  // Stop LORA module from interfering with SPI
+  pinMode(LORA_CS, OUTPUT);
+  digitalWrite(LORA_CS, HIGH);
+  
+  while (!SD.begin(SD_CS)) {
     Serial.println("failed to initialize SD card");
-    while (true); // watchdog will reboot
+    delay(1000); // watchdog will reboot
   }
 }

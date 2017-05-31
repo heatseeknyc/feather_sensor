@@ -270,7 +270,7 @@ uint32_t get_last_reading_time() {
     reading_time_file.close();
   } else {
     Serial.println("unable to read last reading time");
-    while(true);
+    return 0;
   }
 
   return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);

@@ -23,6 +23,7 @@
   #define DHT_DATA  A2
   #define SD_CS     10
   #define FONA_RST  A4
+  #define LORA_CS   8
 #endif
 
 #define USER_AGENT_HEADER  "curl/7.45.0"
