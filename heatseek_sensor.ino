@@ -46,14 +46,13 @@ void loop() {
     enter_configuration();
   }
       
-  Serial.print("time since last reading: ");
+  Serial.print("Time since last reading: ");
   Serial.print(time_since_last_reading);
-  Serial.print(", current_time: ");
-  Serial.print(current_time);
-  Serial.print(", last_reading_time: ");
-  Serial.print(last_reading_time);
   Serial.print(", reading_interval: ");
-  Serial.println(CONFIG.data.reading_interval_s);
+  Serial.print(CONFIG.data.reading_interval_s);
+  Serial.print(".  Code version: ");
+  Serial.print(CODE_VERSION);
+  Serial.println(". Press 'C' to enter config.");
   
   if (time_since_last_reading < CONFIG.data.reading_interval_s) {
     delay(2000);
@@ -132,8 +131,10 @@ void log_to_sd(float temperature_f, float humidity, float heat_index, uint32_t c
 
 void initialize_sd() {
   // Stop LORA module from interfering with SPI
-  pinMode(LORA_CS, OUTPUT);
-  digitalWrite(LORA_CS, HIGH);
+  #ifdef TRANSMITTER_GSM
+    pinMode(LORA_CS, OUTPUT);
+    digitalWrite(LORA_CS, HIGH);
+  #endif
   
   while (!SD.begin(SD_CS)) {
     Serial.println("failed to initialize SD card");

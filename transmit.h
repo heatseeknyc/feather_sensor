@@ -1,6 +1,8 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
+#define CODE_VERSION "F-0.1.1"
+
 #ifdef MCU_STM32F205RG
   #define TRANSMITTER_WIFI
 #else
@@ -14,6 +16,8 @@
 
   #define DHT_DATA  PC2
   #define SD_CS     PB4
+  
+  #define TRANSMITS_PER_LOOP 20
 #endif
 
 #ifdef TRANSMITTER_GSM
@@ -24,6 +28,8 @@
   #define SD_CS     10
   #define FONA_RST  A4
   #define LORA_CS   8
+  
+  #define TRANSMITS_PER_LOOP 5
 #endif
 
 #define USER_AGENT_HEADER  "curl/7.45.0"

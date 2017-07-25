@@ -3,7 +3,7 @@
 
 void watchdog_init() {
   #ifdef TRANSMITTER_WIFI
-    iwdg_init(IWDG_PRE_256, 1476); // 9 second watchdog, 40kHz processor
+    iwdg_init(IWDG_PRE_256, 3500); // 9 second watchdog, 40kHz processor
   #endif
 
   #ifdef TRANSMITTER_GSM
