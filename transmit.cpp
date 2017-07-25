@@ -273,10 +273,6 @@ void transmit_queued_temp(char *filename) {
   read_time_buffer[10] = '\0';
 
   uint32_t read_time = strtoul(read_time_buffer, NULL, 0);
-  Serial.print("read time buf: ");
-  Serial.println(read_time_buffer);
-  Serial.print("read time: ");
-  Serial.println(read_time);
 
   if (temperature_file = SD.open(file_path, FILE_READ)) {
     int read_size = temperature_file.read(temperature.raw, sizeof(temperature));
