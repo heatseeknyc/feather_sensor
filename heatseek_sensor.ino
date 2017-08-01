@@ -8,6 +8,7 @@
 #include "rtc.h"
 
 DHT dht(DHT_DATA, DHT22);
+uint32_t startup_millis = 0;
 
 void setup() {
   watchdog_init();
@@ -30,6 +31,8 @@ void setup() {
   if (!read_config()) set_default_config();
 
   watchdog_feed();
+
+  startup_millis = millis();
 }
 
 void loop() {
@@ -61,7 +64,13 @@ void loop() {
   }
   
   watchdog_feed();
-  
+
+  while (millis() - startup_millis < 10000) {
+    Serial.println("Allowing 10 seconds to enter config mode [C] before taking first reading.");
+    delay(2000);
+    return;
+  }
+
   read_temperatures(&temperature_f, &humidity, &heat_index);
   log_to_sd(temperature_f, humidity, heat_index, current_time);
 

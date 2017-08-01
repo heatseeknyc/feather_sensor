@@ -82,8 +82,8 @@
       delay(1000);
       watchdog_feed();
 
-      if (millis() - start > 30000) {
-        Serial.println("failed to start FONA GPRS after 30 sec");
+      if (millis() - start > 60000) {
+        Serial.println("failed to start FONA GPRS after 60 sec");
         while (true);
       }
     }
