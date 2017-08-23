@@ -7,7 +7,7 @@
 #include "watchdog.h"
 #include "rtc.h"
 
-DHT dht(DHT_DATA, DHT22);
+static DHT dht(DHT_DATA, DHT22);
 uint32_t startup_millis = 0;
 
 void setup() {
@@ -40,9 +40,9 @@ void loop() {
   float humidity;
   float heat_index;
 
-  uint32_t current_time = rtc.now().unixtime();
-  uint32_t last_reading_time = get_last_reading_time();
-  uint32_t time_since_last_reading = current_time - last_reading_time;
+  int32_t current_time = rtc.now().unixtime();
+  int32_t last_reading_time = get_last_reading_time();
+  int32_t time_since_last_reading = current_time - last_reading_time;
 
   char command = Serial.read();
   if (command == 'C') {
@@ -56,8 +56,15 @@ void loop() {
   Serial.print(".  Code version: ");
   Serial.print(CODE_VERSION);
   Serial.println(". Press 'C' to enter config.");
-  
-  if (time_since_last_reading < CONFIG.data.reading_interval_s) {
+
+  if (CONFIG.data.reading_interval_s - time_since_last_reading > SEND_SAVED_READINGS_THRESHOLD) {
+    Serial.println("Checking for queued temperature readings");
+    watchdog_feed();
+    transmit_queued_temps();
+    delay(2000);
+    watchdog_feed();
+    return;
+  } else if (time_since_last_reading < CONFIG.data.reading_interval_s) {
     delay(2000);
     watchdog_feed();
     return;
@@ -94,15 +101,20 @@ void read_temperatures(float *temperature_f, float *humidity, float *heat_index)
     *humidity = dht.readHumidity();
     
     if (!isnan(*temperature_f) && !isnan(*humidity)) {  
-      *heat_index = dht.computeHeatIndex(*temperature_f, *humidity);
-  
-      Serial.print("Temperature: ");
+      Serial.print("Temperature (actual reading): ");
+      Serial.print(*temperature_f);
+      Serial.println(" *F");
+
+      *temperature_f = *temperature_f + CONFIG.data.temperature_offset_f;
+      Serial.print("Temperature (after calibration): ");
       Serial.print(*temperature_f);
       Serial.println(" *F");
       
       Serial.print("Humidity: ");
       Serial.print(*humidity);
       Serial.println("%");
+      
+      *heat_index = dht.computeHeatIndex(*temperature_f, *humidity);
       
       Serial.print("Heat index: ");
       Serial.println(*heat_index);

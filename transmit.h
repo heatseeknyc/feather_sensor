@@ -1,7 +1,7 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
-#define CODE_VERSION "F-0.1.1"
+#define CODE_VERSION "F-0.1.2"
 
 #ifdef MCU_STM32F205RG
   #define TRANSMITTER_WIFI
@@ -32,9 +32,11 @@
   #define TRANSMITS_PER_LOOP 5
 #endif
 
+#define SEND_SAVED_READINGS_THRESHOLD (10 * 60)
 #define USER_AGENT_HEADER  "curl/7.45.0"
 #define PORT               80
 
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time);
+void transmit_queued_temps();
 
 #endif

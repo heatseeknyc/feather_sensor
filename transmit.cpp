@@ -308,6 +308,25 @@ void transmit_queued_temp(char *filename) {
   watchdog_feed();
 }
 
+void transmit_queued_temps() {
+  char filename[100];
+  File pending_dir = SD.open("pending");
+  int temps_transfered_count = 0;
+
+  while (temps_transfered_count < TRANSMITS_PER_LOOP) {
+    File entry = pending_dir.openNextFile();
+    if (!entry) { break; } // No more files
+    
+    strcpy(filename, entry.name());
+    entry.close();
+    
+    transmit_queued_temp(filename);
+    temps_transfered_count += 1;
+  }
+
+  pending_dir.close();
+}
+
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
   watchdog_feed();
   
@@ -325,20 +344,5 @@ void transmit(float temperature_f, float humidity, float heat_index, uint32_t cu
   Serial.println(filename);
 
   transmit_queued_temp(filename);
-
-  File pending_dir = SD.open("pending");
-  int temps_transfered_count = 0;
-
-  while (temps_transfered_count < TRANSMITS_PER_LOOP) {
-    File entry = pending_dir.openNextFile();
-    if (!entry) { break; } // No more files
-    
-    strcpy(filename, entry.name());
-    entry.close();
-    
-    transmit_queued_temp(filename);
-    temps_transfered_count += 1;
-  }
-
-  pending_dir.close();
+  transmit_queued_temps();
 }

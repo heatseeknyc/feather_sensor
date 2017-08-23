@@ -1,11 +1,13 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_VERSION     4
+#define CONFIG_VERSION     5
 
 typedef struct {
   uint16_t version;
-  uint32_t reading_interval_s;
+  int32_t reading_interval_s;
+
+  float temperature_offset_f;
 
   uint8_t cell_configured;
   char hub_id[50];

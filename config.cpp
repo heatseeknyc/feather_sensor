@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <DHT.h>
 #include "config.h"
 #include <SD.h>
 #include "watchdog.h"
@@ -6,6 +7,7 @@
 #include "transmit.h"
 
 CONFIG_union CONFIG;
+static DHT dht(DHT_DATA, DHT22);
 
 void write_config() {
   File config_file;
@@ -57,6 +59,7 @@ void set_default_config() {
   CONFIG.data.reading_interval_s = 5 * 60;
   CONFIG.data.cell_configured = 0;
   CONFIG.data.wifi_configured = 0;
+  CONFIG.data.temperature_offset_f = 0.0;
 
   strcpy(CONFIG.data.endpoint_domain, "hs-relay-staging.herokuapp.com");
   strcpy(CONFIG.data.endpoint_path, "/temperatures");
@@ -73,7 +76,7 @@ int read_input_until_newline(char *message, char *buffer) {
     while (Serial.available()) {
       char c = Serial.read();
       if (c == '\n') {
-        Serial.println("done setting");
+//        Serial.println("done setting");
         reached_newline = true;
         break;
       } else {
@@ -94,6 +97,7 @@ void print_menu() {
   Serial.println("[?] Print this menu");
   Serial.println("[t] Set RTC");
   Serial.println("[r] Set reading interval");
+  Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
   #endif
@@ -167,7 +171,7 @@ void enter_configuration() {
           
           length = read_input_until_newline("Enter Reading interval in seconds", buffer);
           buffer[length] = '\0';
-          CONFIG.data.reading_interval_s = strtoul(buffer, NULL, 0);
+          CONFIG.data.reading_interval_s = strtol(buffer, NULL, 0);
 
           write_config();
 
@@ -253,6 +257,52 @@ void enter_configuration() {
         case 's': {
           Serial.println("exiting config");
           return;
+        }
+        case 'v': {
+          char buffer[200];
+          int length;
+          float current_temp;
+          int readings_taken = 0;
+          float temperature_f;
+          float average_temperature_f = 0.0;
+          
+          length = read_input_until_newline("Enter current temperature, in fahrenheit, with one decimal place.  For example: '41.0'.  PLEASE ENSURE THAT SENSOR IS ON FOR APPROX. 5 MINUTES BEFORE CALIBRATING!", buffer);
+          buffer[length] = '\0';
+          current_temp = strtof(buffer, NULL);
+
+          while (readings_taken < 5) {
+            watchdog_feed();
+            Serial.println("Calibrating, please wait...");
+            temperature_f = dht.readTemperature(true);
+            
+            if (!isnan(temperature_f)) {
+              if (average_temperature_f == 0.0) {
+                average_temperature_f = temperature_f;
+              } else {
+                average_temperature_f = (average_temperature_f + temperature_f) / 2;
+              }
+            } else {
+              Serial.println("Failed to read temperature sensor; reboot device and try again.");
+              while(true);
+            }
+            
+            watchdog_feed();
+            readings_taken++;
+            delay(2000);
+          }
+
+          watchdog_feed();
+          
+          float temperature_offset = current_temp - average_temperature_f;
+          CONFIG.data.temperature_offset_f = temperature_offset;
+          write_config();
+          
+          Serial.print("Temperature offset set to: ");
+          Serial.println(temperature_offset);
+          
+          print_config_info();
+          print_menu();
+          break;
         }
     }
 
