@@ -327,6 +327,35 @@ void transmit_queued_temps() {
   pending_dir.close();
 }
 
+void clear_queued_transmissions() {
+  File pending_dir = SD.open("pending");
+
+  Serial.println("==== Removing queued temperature files");
+  while (true) {
+    watchdog_feed();
+    
+    File entry = pending_dir.openNextFile();
+    if (!entry) { break; } // No more files
+
+    char filename[100];
+    strcpy(filename, entry.name());
+    entry.close();
+
+    char file_path[100];
+    sprintf(file_path, "pending/%s", filename);
+  
+    if (SD.remove(file_path)) {
+      Serial.println("removed queued temperature file.");
+    } else {
+      Serial.println("failed to remove queued temperature file.");
+    }
+  }
+  
+  Serial.println("====");
+
+  pending_dir.close();
+}
+
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
   watchdog_feed();
   

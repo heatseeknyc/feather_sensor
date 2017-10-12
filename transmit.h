@@ -1,7 +1,7 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
-#define CODE_VERSION "F-0.1.2"
+#define CODE_VERSION "F-1.0.0"
 
 #ifdef MCU_STM32F205RG
   #define TRANSMITTER_WIFI
@@ -38,5 +38,6 @@
 
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time);
 void transmit_queued_temps();
+void clear_queued_transmissions();
 
 #endif

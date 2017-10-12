@@ -1,7 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_VERSION     5
+#define CONFIG_VERSION     6
 
 typedef struct {
   uint16_t version;

@@ -60,8 +60,10 @@ void set_default_config() {
   CONFIG.data.cell_configured = 0;
   CONFIG.data.wifi_configured = 0;
   CONFIG.data.temperature_offset_f = 0.0;
-
-  strcpy(CONFIG.data.endpoint_domain, "hs-relay-staging.herokuapp.com");
+  
+  strcpy(CONFIG.data.hub_id, "featherhub");
+  
+  strcpy(CONFIG.data.endpoint_domain, "relay.heatseek.org");
   strcpy(CONFIG.data.endpoint_path, "/temperatures");
   CONFIG.data.endpoint_configured = 1;
 }
@@ -97,6 +99,7 @@ void print_menu() {
   Serial.println("[?] Print this menu");
   Serial.println("[t] Set RTC");
   Serial.println("[r] Set reading interval");
+  Serial.println("[q] Clear reading transmission queue");
   Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
@@ -131,7 +134,7 @@ void print_config_info() {
     Serial.print(", cell id: ");
     Serial.print(CONFIG.data.cell_id);
   } else {
-    Serial.print("hub/cell id not configured");
+    Serial.print("cell id not configured");
   }
   Serial.println();
 
@@ -165,6 +168,11 @@ void enter_configuration() {
           print_menu();
           break;
         }
+        case 'q': {
+          clear_queued_transmissions();
+          print_menu();
+          break;
+        }
         case 'r': {
           char buffer[200];
           int length;
@@ -174,6 +182,9 @@ void enter_configuration() {
           CONFIG.data.reading_interval_s = strtol(buffer, NULL, 0);
 
           write_config();
+
+          update_last_reading_time(0); // take initial reading after configuration
+          clear_queued_transmissions(); // clear transmission queue
 
           Serial.println("Reading interval Configured");
           print_config_info();
@@ -203,10 +214,11 @@ void enter_configuration() {
         case 'i': {
           char buffer[200];
           int length;
-          
-          length = read_input_until_newline("Enter HUB ID", buffer);
-          buffer[length] = '\0';
-          strcpy(CONFIG.data.hub_id, buffer);
+
+//          hub is now always set to 'featherhub'
+//          length = read_input_until_newline("Enter HUB ID", buffer);
+//          buffer[length] = '\0';
+//          strcpy(CONFIG.data.hub_id, buffer);
           
           length = read_input_until_newline("Enter CELL ID", buffer);
           buffer[length] = '\0';
