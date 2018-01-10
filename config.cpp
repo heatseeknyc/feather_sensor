@@ -205,6 +205,7 @@ void enter_configuration() {
 
           CONFIG.data.wifi_configured = 1;
           write_config();
+          force_wifi_reconnect();
 
           Serial.println("Wifi Configured");
           print_config_info();

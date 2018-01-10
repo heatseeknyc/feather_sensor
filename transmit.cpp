@@ -122,6 +122,10 @@
 #endif 
 
 #ifdef TRANSMITTER_WIFI
+  void force_wifi_reconnect(void) {
+    wifiConnected = false;
+  }
+
   void receive_callback(void) {
     http.respParseHeader();
     int status_received = http.respStatus();

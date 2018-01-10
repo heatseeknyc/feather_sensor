@@ -57,6 +57,13 @@ void loop() {
   Serial.print(CODE_VERSION);
   Serial.println(". Press 'C' to enter config.");
 
+  if (millis() - startup_millis < 15000) {
+    Serial.println("Allowing 15 seconds to enter config mode [C] before taking first reading.");
+    watchdog_feed();
+    delay(2000);
+    return;
+  }
+  
   if (CONFIG.data.reading_interval_s - time_since_last_reading > SEND_SAVED_READINGS_THRESHOLD) {
     Serial.println("Checking for queued temperature readings");
     watchdog_feed();
@@ -71,12 +78,6 @@ void loop() {
   }
   
   watchdog_feed();
-
-  while (millis() - startup_millis < 10000) {
-    Serial.println("Allowing 10 seconds to enter config mode [C] before taking first reading.");
-    delay(2000);
-    return;
-  }
 
   read_temperatures(&temperature_f, &humidity, &heat_index);
   log_to_sd(temperature_f, humidity, heat_index, current_time);

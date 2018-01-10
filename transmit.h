@@ -39,5 +39,8 @@
 void transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time);
 void transmit_queued_temps();
 void clear_queued_transmissions();
+#ifdef TRANSMITTER_WIFI
+void force_wifi_reconnect();
+#endif
 
 #endif
