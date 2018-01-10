@@ -395,29 +395,26 @@ char const* get_encryption_str(int32_t enc_type)
   // read the encryption type and print out the name:
   switch (enc_type)
   {
-    case ENC_TYPE_WEP:
-      return "WEP";
-    break;
-
-    case ENC_TYPE_WPA_TKIP:
-    case ENC_TYPE_WPA_AES:
-    case ENC_TYPE_WPA_MIXED:
-      return "WPA";
-    break;
-
-    case ENC_TYPE_WPA2_AES:
-    case ENC_TYPE_WPA2_TKIP:
-    case ENC_TYPE_WPA2_MIXED:
-      return "WPA2";
-    break;
-
-    case ENC_TYPE_OPEN:
-      return "OPEN";
-    break;
-
-    default:
-      return "OTHER";
-    break;
+    case ENC_TYPE_AUTO: return "ENC_TYPE_AUTO";
+    case ENC_TYPE_OPEN: return "ENC_TYPE_OPEN";
+    case ENC_TYPE_WEP: return "ENC_TYPE_WEP";
+    case ENC_TYPE_WEP_SHARED: return "ENC_TYPE_WEP_SHARED";
+    case ENC_TYPE_WPA_TKIP: return "ENC_TYPE_WPA_TKIP";
+    case ENC_TYPE_WPA_AES: return "ENC_TYPE_WPA_AES";
+    case ENC_TYPE_WPA_MIXED: return "ENC_TYPE_WPA_MIXED";
+    case ENC_TYPE_WPA2_AES: return "ENC_TYPE_WPA2_AES";
+    case ENC_TYPE_WPA2_TKIP: return "ENC_TYPE_WPA2_TKIP";
+    case ENC_TYPE_WPA2_MIXED: return "ENC_TYPE_WPA2_MIXED";
+    case ENC_TYPE_WPA_TKIP_ENT: return "ENC_TYPE_WPA_TKIP_ENT";
+    case ENC_TYPE_WPA_AES_ENT: return "ENC_TYPE_WPA_AES_ENT";
+    case ENC_TYPE_WPA_MIXED_ENT: return "ENC_TYPE_WPA_MIXED_ENT";
+    case ENC_TYPE_WPA2_TKIP_ENT: return "ENC_TYPE_WPA2_TKIP_ENT";
+    case ENC_TYPE_WPA2_AES_ENT: return "ENC_TYPE_WPA2_AES_ENT";
+    case ENC_TYPE_WPA2_MIXED_ENT: return "ENC_TYPE_WPA2_MIXED_ENT";
+    case ENC_TYPE_WPS_OPEN: return "ENC_TYPE_WPS_OPEN";
+    case ENC_TYPE_WPS_SECURE: return "ENC_TYPE_WPS_SECURE";
+    case ENC_TYPE_IBSS_OPEN: return "ENC_TYPE_IBSS_OPEN";
+    default: return "UNKNOWN";
   }
 }
 #endif
