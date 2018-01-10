@@ -1,7 +1,7 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
-#define CODE_VERSION "F-1.0.0"
+#define CODE_VERSION "F-1.1.0"
 
 #ifdef MCU_STM32F205RG
   #define TRANSMITTER_WIFI

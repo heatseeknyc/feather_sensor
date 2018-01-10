@@ -6,6 +6,10 @@
 #include "rtc.h"
 #include "transmit.h"
 
+#ifdef TRANSMITTER_WIFI
+char const* get_encryption_str(int32_t enc_type);
+#endif
+
 CONFIG_union CONFIG;
 static DHT dht(DHT_DATA, DHT22);
 
@@ -103,6 +107,7 @@ void print_menu() {
   Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
+    Serial.println("[a] List nearby access points");
   #endif
   Serial.println("[i] Setup Cell ID");
   Serial.println("[e] Setup API Endpoint");
@@ -191,6 +196,7 @@ void enter_configuration() {
           print_menu();
           break;
         }
+#ifdef TRANSMITTER_WIFI
         case 'w': {
           char buffer[200];
           int length;
@@ -212,6 +218,29 @@ void enter_configuration() {
           print_menu();
           break;
         }
+        case 'a': {
+          wl_ap_info_t ap_list[20];
+          int networkCount = 0;
+          networkCount = Feather.scanNetworks(ap_list, 20);
+          
+          Serial.println("=========");
+          Serial.print("Found "); Serial.print(networkCount); Serial.println(" Networks");
+
+          for (int i = 0; i < networkCount; i++) {
+            Serial.println("=========");
+            wl_ap_info_t ap = ap_list[i];
+            Serial.print("SSID: "); Serial.println(ap.ssid);
+            Serial.print("RSSI: "); Serial.println(ap.rssi);
+            Serial.print("max data rate: "); Serial.println(ap.max_data_rate);
+            Serial.print("network type: "); Serial.println(ap.network_type);
+            Serial.print("security: "); Serial.print(ap.security); Serial.print(" - "); Serial.println(get_encryption_str(ap.security));
+            Serial.print("channel: "); Serial.println(ap.channel);
+            Serial.print("band_2_4ghz: "); Serial.println(ap.band_2_4ghz);
+          }
+          
+          break;
+        }
+#endif
         case 'i': {
           char buffer[200];
           int length;
@@ -359,3 +388,36 @@ void update_last_reading_time(uint32_t timestamp) {
 
   Serial.println("updated last reading time");
 }
+
+#ifdef TRANSMITTER_WIFI
+char const* get_encryption_str(int32_t enc_type)
+{
+  // read the encryption type and print out the name:
+  switch (enc_type)
+  {
+    case ENC_TYPE_WEP:
+      return "WEP";
+    break;
+
+    case ENC_TYPE_WPA_TKIP:
+    case ENC_TYPE_WPA_AES:
+    case ENC_TYPE_WPA_MIXED:
+      return "WPA";
+    break;
+
+    case ENC_TYPE_WPA2_AES:
+    case ENC_TYPE_WPA2_TKIP:
+    case ENC_TYPE_WPA2_MIXED:
+      return "WPA2";
+    break;
+
+    case ENC_TYPE_OPEN:
+      return "OPEN";
+    break;
+
+    default:
+      return "OTHER";
+    break;
+  }
+}
+#endif
