@@ -1,21 +1,33 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
-#define CODE_VERSION "F-1.1.0"
+#define CODE_VERSION "F-1.2.0"
 
-#ifdef MCU_STM32F205RG
-  #define TRANSMITTER_WIFI
-#else
+#include "user_config.h"
+
+#ifdef HEATSEEK_FEATHER_CELL_M0
   #define TRANSMITTER_GSM
+#else
+  #define TRANSMITTER_WIFI
 #endif
 
-#ifdef TRANSMITTER_WIFI
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
   #include <libmaple/iwdg.h>
   #include <adafruit_feather.h>
   #include <adafruit_http.h>
 
   #define DHT_DATA  PC2
   #define SD_CS     PB4
+  
+  #define TRANSMITS_PER_LOOP 20
+#endif
+
+#ifdef HEATSEEK_FEATHER_WIFI_M0
+  #include <ArduinoHttpClient.h>
+  #include <WiFi101.h>
+
+  #define DHT_DATA  A2
+  #define SD_CS     10
   
   #define TRANSMITS_PER_LOOP 20
 #endif
@@ -42,5 +54,5 @@ void clear_queued_transmissions();
 #ifdef TRANSMITTER_WIFI
 void force_wifi_reconnect();
 #endif
-
+  
 #endif
