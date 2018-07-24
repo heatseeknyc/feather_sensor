@@ -3,11 +3,16 @@
 #include "watchdog.h"
 #include <SD.h>
 
-#ifdef TRANSMITTER_WIFI
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
   AdafruitHTTP http;
   bool wifiConnected = false;
   volatile bool response_received = false;
   volatile bool transmit_success = false;
+#endif
+
+#ifdef HEATSEEK_FEATHER_WIFI_M0
+  WiFiClient wifiClient;
+  bool wifiConnected = false;
 #endif
 
 #ifdef TRANSMITTER_GSM
@@ -121,7 +126,7 @@
   }
 #endif 
 
-#ifdef TRANSMITTER_WIFI
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
   void force_wifi_reconnect(void) {
     wifiConnected = false;
   }
@@ -212,6 +217,76 @@
     while (!response_received || !transmit_success); // Hang if transmit doesn't complete or fails
 
     return true;
+  }
+#endif
+
+#ifdef HEATSEEK_FEATHER_WIFI_M0
+  void force_wifi_reconnect(void) {
+    if (wifiConnected) {
+      wifiConnected = false;
+      WiFi.end();
+    }
+  }
+  
+  void connect_to_wifi() {
+    WiFi.setPins(8, 7, 4, 2);
+    
+    Serial.print("Please wait while connecting to:");
+    Serial.print(CONFIG.data.wifi_ssid);
+    Serial.println("... ");
+
+    int status = WL_IDLE_STATUS;
+
+    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+    status = WiFi.begin(CONFIG.data.wifi_ssid, CONFIG.data.wifi_pass);
+    
+    while (status != WL_CONNECTED) {
+      delay(1000);
+      Serial.println("Establishing connection...");
+    }
+
+    wifiConnected = true;
+    Serial.println("Connected to WiFi");
+
+    Serial.print("SSID: ");
+    Serial.println(WiFi.SSID());
+  
+    // print the received signal strength:
+    long rssi = WiFi.RSSI();
+    Serial.print("signal strength (RSSI):");
+    Serial.print(rssi);
+    Serial.println(" dBm");
+
+    watchdog_feed();
+  }
+  
+  bool _transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
+    if (!CONFIG.data.cell_configured || !CONFIG.data.wifi_configured || !CONFIG.data.endpoint_configured) {
+      Serial.println("cannot send data - not configured");
+      return false;
+    }
+  
+    if (!wifiConnected) { connect_to_wifi(); }
+
+    HttpClient client = HttpClient(wifiClient, CONFIG.data.endpoint_domain, 80);
+
+    String contentType = "application/x-www-form-urlencoded";
+    String data = "temp=" + String(temperature_f, 3) + "&humidity=" + String(humidity, 3) + "&heat_index=" + String(heat_index, 3) + "&hub=" + CONFIG.data.hub_id + "&cell=" + CONFIG.data.cell_id + "&time=" + current_time + "&sp=" + CONFIG.data.reading_interval_s + "&cell_version=" + CODE_VERSION;   
+
+    Serial.print("Posting data: ");
+    Serial.println(data);
+
+    client.post(CONFIG.data.endpoint_path, contentType, data);
+
+    int statusCode = client.responseStatusCode();
+    String response = client.responseBody();
+  
+    Serial.print("Status code: ");
+    Serial.println(statusCode);
+    Serial.print("Response: ");
+    Serial.println(response);
+  
+    return statusCode == 200;
   }
 #endif
 

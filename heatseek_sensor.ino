@@ -2,6 +2,7 @@
 #include <DHT.h>
 #include <SD.h>
 #include <SPI.h>
+#include "user_config.h"
 #include "transmit.h"
 #include "config.h"
 #include "watchdog.h"
