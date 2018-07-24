@@ -6,7 +6,7 @@
 #include "rtc.h"
 #include "transmit.h"
 
-#ifdef TRANSMITTER_WIFI
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
 char const* get_encryption_str(int32_t enc_type);
 #endif
 
@@ -107,6 +107,8 @@ void print_menu() {
   Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
+  #endif
+  #ifdef HEATSEEK_FEATHER_WIFI_WICED
     Serial.println("[a] List nearby access points");
   #endif
   Serial.println("[i] Setup Cell ID");
@@ -218,6 +220,8 @@ void enter_configuration() {
           print_menu();
           break;
         }
+#endif
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
         case 'a': {
           wl_ap_info_t ap_list[20];
           int networkCount = 0;
@@ -389,7 +393,7 @@ void update_last_reading_time(uint32_t timestamp) {
   Serial.println("updated last reading time");
 }
 
-#ifdef TRANSMITTER_WIFI
+#ifdef HEATSEEK_FEATHER_WIFI_WICED
 char const* get_encryption_str(int32_t enc_type)
 {
   // read the encryption type and print out the name:
