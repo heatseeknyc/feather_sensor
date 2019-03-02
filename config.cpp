@@ -250,9 +250,8 @@ void enter_configuration() {
 #endif
 #ifdef HEATSEEK_FEATHER_WIFI_M0
         case 'a': {
-          // Derived from ScanNetworks sample of WiFi101 library
-          // TODO: Assuming that WiFi is available here when it totally could not be
-          int networkCount = 0;
+          int networkCount = -1;
+          WiFi.setPins(8, 7, 4, 2);
           networkCount = WiFi.scanNetworks();
 
           Serial.println("=========");
@@ -276,6 +275,7 @@ void enter_configuration() {
                 Serial.println("Auto");
             }
           }
+          print_menu();
           break;
         }
 #endif
