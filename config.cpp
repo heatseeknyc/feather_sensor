@@ -107,11 +107,6 @@ void print_menu() {
   Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
-  #endif
-  // #ifdef HEATSEEK_FEATHER_WIFI_WICED
-  //   Serial.println("[a] List nearby access points");
-  // #endif
-  #ifdef TRANSMITTER_WIFI
     Serial.println("[a] List nearby access points");
   #endif
   Serial.println("[i] Setup Cell ID");
