@@ -54,6 +54,11 @@
 - [Sticker Antenna](https://www.adafruit.com/product/3237)
 - [SIM800L GSM Breakout Module](http://www.ebay.com/itm/SIM800L-Quad-band-Network-Mini-GPRS-GSM-Breakout-Module-Ships-from-California-/172265821650?hash=item281bd7d5d2:g:97gAAOSwls5Y5qFG)
 
+### Particle Boron (LTE)
+
+- Coming soon!
+- All base parts
+- [Particle Boron](https://docs.particle.io/boron/)
 
 ### Headseek Featherwing Board
 
