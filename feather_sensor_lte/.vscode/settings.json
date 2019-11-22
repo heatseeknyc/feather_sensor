@@ -1,0 +1,11 @@
+{
+    "extensions.ignoreRecommendations": true,
+    "cortex-debug.openocdPath": "${command:particle.getDebuggerOpenocdPath}",
+    "files.associations": {
+        "*.ino": "cpp"
+    },
+    "particle.targetDevice": "e00fce68ec3e4cd7fe833f2e",
+    "particle.firmwareVersion": "1.1.0",
+    "particle.targetPlatform": "boron",
+    "git.ignoreLimitWarning": true
+}

@@ -3,6 +3,11 @@
 #include "watchdog.h"
 #include <SD.h>
 
+#ifdef HEATSEEK_BORON_LTE
+	TCPClient tcpClient;
+	Bool lteConnected = false;
+#endif
+
 #ifdef HEATSEEK_FEATHER_WIFI_WICED
   AdafruitHTTP http;
   bool wifiConnected = false;
@@ -288,6 +293,42 @@
   
     return statusCode == 200;
   }
+#endif
+
+#ifdef HEATSEEK_BORON_LTE
+  // Function to reconnect to LTE?
+  void force_lte_reconnect(void);
+
+	// Function to connect to Particle Cloud
+	void connect_to_lte(){
+    // Configure the connection here.
+    Serial.println(“Establishing connection...”);
+    // Connect to LTE network here.
+    Serial.println(“Connected to LTE”);
+    watchdog_feed();
+  }
+  
+  // Function to transmit
+  bool _transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time){
+	  // If cell / API endpoint not configured, indicate error
+    if (!CONFIG.data.cell_configured || !CONFIG.data.endpoint_configured) {
+      Serial.println("cannot send data - not configured");
+      return false;
+    }
+
+    // If not connected, connect
+    if(!lteConnected){
+      connect_to_lte();
+    }
+
+    // Set up TCPClient
+    // Do some error checking
+    client.connect(CONFIG.data.endpoint_domain, 80);
+    // Load contenttype
+    // Load data
+    // Post data via TCPClient
+    // Done.
+}
 #endif
 
 typedef struct {
