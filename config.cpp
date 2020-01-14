@@ -107,8 +107,6 @@ void print_menu() {
   Serial.println("[v] Calibrate temperature sensor");
   #ifdef TRANSMITTER_WIFI
     Serial.println("[w] Setup wifi");
-  #endif
-  #ifdef HEATSEEK_FEATHER_WIFI_WICED
     Serial.println("[a] List nearby access points");
   #endif
   Serial.println("[i] Setup Cell ID");
@@ -242,6 +240,37 @@ void enter_configuration() {
             Serial.print("band_2_4ghz: "); Serial.println(ap.band_2_4ghz);
           }
           
+          break;
+        }
+#endif
+#ifdef HEATSEEK_FEATHER_WIFI_M0
+        case 'a': {
+          int networkCount = -1;
+          WiFi.setPins(8, 7, 4, 2);
+          networkCount = WiFi.scanNetworks();
+
+          Serial.println("=========");
+          Serial.print("Found "); Serial.print(networkCount); Serial.println(" Networks");
+          
+          for (int i = 0; i < networkCount; i++) {
+            Serial.println("=========");
+            Serial.print("SSID: "); Serial.println(WiFi.SSID(i));
+            Serial.print("RSSI: "); Serial.println(WiFi.RSSI(i));
+            Serial.print("security: ");
+            switch (WiFi.encryptionType(i)) {
+              case ENC_TYPE_WEP:
+                Serial.println("WEP");
+              case ENC_TYPE_TKIP:
+                Serial.println("WPA");
+              case ENC_TYPE_CCMP:
+                Serial.println("WPA2");
+              case ENC_TYPE_NONE:
+                Serial.println("None");
+              case ENC_TYPE_AUTO:
+                Serial.println("Auto");
+            }
+          }
+          print_menu();
           break;
         }
 #endif
