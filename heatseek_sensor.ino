@@ -58,10 +58,10 @@ void loop() {
   Serial.print(CODE_VERSION);
   Serial.println(". Press 'C' to enter config.");
 
-  if (millis() - startup_millis < 15000) {
-    Serial.println("Allowing 15 seconds to enter config mode [C] before taking first reading.");
+  if (millis() - startup_millis < 10000) {
+    Serial.println("Allowing 10 seconds to enter config mode [C] before taking first reading.");
     watchdog_feed();
-    delay(2000);
+    delay(1000);
     return;
   }
   

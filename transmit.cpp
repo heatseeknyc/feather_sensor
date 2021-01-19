@@ -3,6 +3,7 @@
 #include "watchdog.h"
 #include <SD.h>
 
+
 #ifdef HEATSEEK_FEATHER_WIFI_WICED
   AdafruitHTTP http;
   bool wifiConnected = false;
@@ -20,7 +21,7 @@
 
   HardwareSerial *fonaSerial = &Serial1;
 
-  Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
+  Adafruit_FONA_LTE fona = Adafruit_FONA_LTE();
   bool gsmConnected = false;
 #endif
 
@@ -49,10 +50,9 @@
 
     Serial.print("posting to: "); Serial.println(url);
     Serial.print("with data: "); Serial.println(data);
-
-    if (!fona.HTTP_POST_start(url, F("application/x-www-form-urlencoded"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length)) {
-      return false;
-    }
+    
+    fona.HTTP_POST_start(url, F("application/x-www-form-urlencoded"), (uint8_t *) data, strlen(data), &statuscode, (uint16_t *)&length);
+      
 
     Serial.println("reading status");
 
@@ -60,28 +60,75 @@
       Serial.print("status not 200: ");
       Serial.println(statuscode);
       return false;
+    } else {
+      Serial.print("SUCCESS: status 200");
+      while (Serial.available()) {
+        delay(1);
+        fona.write(Serial.read());
+      }
+      if (fona.available()) {
+        Serial.write(fona.read());
+      }
+      delay(1000);
     }
 
     fona.HTTP_POST_end();
+    
     return true;
   }
 
   void connect_to_fona() {
-    Serial.println('starting fona serial');
-    fonaSerial->begin(4800);
-    
-    Serial.println('starting fona serial 2');
-    if (!fona.begin(*fonaSerial)) {
-      Serial.println("Couldn't find FONA");
-      while(true); // watchdog will reboot
+
+    fonaSerial->begin(115200); // Default SIM7000 shield baud rate
+  
+    Serial.println(F("Configuring to 9600 baud"));
+    fonaSerial->println("AT+IPR=9600"); // Set baud rate
+    delay(100); // Short pause to let the command run
+    fonaSerial->begin(9600);
+    if (! fona.begin(*fonaSerial)) {
+      Serial.println(F("Couldn't find FONA"));
+      while(1); // Don't proceed if it couldn't find the device
+    }
+    Serial.println(F("FONA is OK"));
+  
+    // Print module IMEI number.
+    char imei[15] = {0}; // MUST use a 16 character buffer for IMEI!
+    uint8_t imeiLen = fona.getIMEI(imei);
+    if (imeiLen > 0) {
+      Serial.print("Module IMEI: "); Serial.println(imei);
     }
 
-    watchdog_feed();
-    delay(2000);
+    //    watchdog_feed();
+    //    delay(2000);
+
+    // Set modem to full functionality
+    fona.setFunctionality(1); // AT+CFUN=1
+  
+    // Configure a GPRS APN, username, and password.
+    // You might need to do this to access your network's GPRS/data
+    // network. 
+    fona.setNetworkSettings(F("ting")); // For Hologram SIM card
+
 
     Serial.println('enabling FONA GPRS');
 
+
     uint32_t start = millis();
+    // read the network/cellular status
+    uint8_t n = fona.getNetworkStatus();
+    Serial.print(F("Network status "));
+    Serial.print(n);
+    Serial.print(F(": "));
+    if (n == 0) Serial.println(F("Not registered"));
+    if (n == 1) Serial.println(F("Registered (home)"));
+    if (n == 2) Serial.println(F("Not registered (searching)"));
+    if (n == 3) Serial.println(F("Denied"));
+    if (n == 4) Serial.println(F("Unknown"));
+    if (n == 5) Serial.println(F("Registered roaming"));
+
+    if (!fona.enableGPRS(false)) {
+      Serial.println(F("Failed to turn off"));
+    }
     
     while (!fona.enableGPRS(true)) {
       delay(1000);
@@ -103,7 +150,8 @@
       Serial.println("cannot send data - not configured");
       return false;
     }
-
+    uint32_t start = millis();
+    
     if (!gsmConnected) connect_to_fona();
     watchdog_feed();
 
@@ -112,11 +160,31 @@
     while (!fona_post(temperature_f, humidity, heat_index, current_time)) {
       Serial.print("failed to POST, trying again... attempt #");
       Serial.println(transmit_attempts);
+
+     
+      watchdog_feed();
+      // Attempt to turn on
+      while (!fona.enableGPRS(true)) {
+        Serial.println("Attempting to restart FONA GPRS");
+        delay(1000);
+        watchdog_feed();
+        // Attempt to turn off
+        fona.enableGPRS(false);
+        delay(1000);
+        watchdog_feed();
+        
+        if (millis() - start > 120000) {
+          Serial.println("failed to restart FONA GPRS after 120 sec");
+          while (true);
+        }
+      }
       
+      Serial.println("Re-enabled FONA GRPS");
       if (transmit_attempts < 4) {
         transmit_attempts++;
         watchdog_feed();
-        delay(500);
+        delay(1000);
+        watchdog_feed();
       } else {
         while (true);
       }
@@ -360,15 +428,23 @@ void transmit_queued_temp(char *filename) {
       bool transmit_success = _transmit(temperature.data.temperature_f, temperature.data.humidity, temperature.data.heat_index, read_time);
       
       temperature_file.close();
-      delay(100);
+ 
         
       if (transmit_success) {
         Serial.println("transferred.");
-
+        watchdog_feed();
+        Serial.println("attempting to remove file");
+        delay(1000);
+        while (!SD.begin(SD_CS)) {
+            Serial.println("failed to initialize SD card");
+            delay(1000); // watchdog will reboot
+          }
         if (SD.remove(file_path)) {
           Serial.println("removed.");
         } else {
-          Serial.println("failed to remove file");
+          Serial.print("failed to remove file ");
+          Serial.print(file_path);
+          Serial.print("\n");
         }
       } else {
         Serial.println("failed to transfer");

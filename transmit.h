@@ -1,7 +1,7 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
-#define CODE_VERSION "F-1.2.0"
+#define CODE_VERSION "F-1.3.2"
 
 #include "user_config.h"
 
