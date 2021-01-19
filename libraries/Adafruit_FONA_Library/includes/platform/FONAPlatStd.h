@@ -30,20 +30,29 @@
 
 #if (ARDUINO >= 100)
   #include "Arduino.h"
-  #if !defined(__SAM3X8E__) && !defined(ARDUINO_ARCH_SAMD)  // Arduino Due doesn't support     #include <SoftwareSerial.h>
+  #if !defined(__SAM3X8E__) && !defined(ARDUINO_ARCH_SAMD)  // Arduino Due doesn't support #include <SoftwareSerial.h>
   #endif
 #else
   #include "WProgram.h"
   #include <NewSoftSerial.h>
 #endif
 
-#include <avr/pgmspace.h>
-
+#if (defined(__AVR__))
+  #include <avr/pgmspace.h>
+// #elif (defined(__ARM__))
+// 	#define PROGMEM const
+#elif (defined(ESP8266))
+	#include <pgmspace.h>
+#endif
 
 // DebugStream	sets the Stream output to use
 // for debug (only applies when ADAFRUIT_FONA_DEBUG
 // is defined in config)
-#define DebugStream		Serial
+#if defined(ARDUINO_ARCH_SAMD)
+  #define DebugStream   SERIAL_PORT_USBVIRTUAL // Needed for SAMD21
+#else
+  #define DebugStream		Serial
+#endif
 
 #ifdef ADAFRUIT_FONA_DEBUG
 // need to do some debugging...
