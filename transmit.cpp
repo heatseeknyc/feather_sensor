@@ -78,15 +78,29 @@
   }
 
   void connect_to_fona() {
-
+    // The watchdog is timing out faster than fonaSerial->begin can execute.
+    // disable it just during initial connection
+    watchdog_disable();
+    pinMode(FONA_RST, OUTPUT);
+    digitalWrite(FONA_RST, HIGH); // Default state
+    delay(100);
+    digitalWrite(FONA_RST, LOW); // Default state
+    uint32_t start = millis();
+    
+    Serial.println("Giving modem 5 sec to reset");
+    delay(5000);
+    
+    
     fonaSerial->begin(115200); // Default SIM7000 shield baud rate
-  
+  delay(100); // Short pause to let the command run
     Serial.println(F("Configuring to 9600 baud"));
+//    fona.setBaudrate(9600); // Set to 9600 baud
     fonaSerial->println("AT+IPR=9600"); // Set baud rate
     delay(100); // Short pause to let the command run
     fonaSerial->begin(9600);
     if (! fona.begin(*fonaSerial)) {
       Serial.println(F("Couldn't find FONA"));
+      watchdog_kill();
       while(1); // Don't proceed if it couldn't find the device
     }
     Serial.println(F("FONA is OK"));
@@ -98,8 +112,6 @@
       Serial.print("Module IMEI: "); Serial.println(imei);
     }
 
-    //    watchdog_feed();
-    //    delay(2000);
 
     // Set modem to full functionality
     fona.setFunctionality(1); // AT+CFUN=1
@@ -110,10 +122,11 @@
     fona.setNetworkSettings(F("ting")); // For Hologram SIM card
 
 
-    Serial.println('enabling FONA GPRS');
+    Serial.println(F("enabling FONA GPRS"));
 
+    watchdog_init();
 
-    uint32_t start = millis();
+    
     // read the network/cellular status
     uint8_t n = fona.getNetworkStatus();
     Serial.print(F("Network status "));
@@ -126,23 +139,45 @@
     if (n == 4) Serial.println(F("Unknown"));
     if (n == 5) Serial.println(F("Registered roaming"));
 
-    if (!fona.enableGPRS(false)) {
-      Serial.println(F("Failed to turn off"));
-    }
-    
-    while (!fona.enableGPRS(true)) {
-      delay(1000);
-      watchdog_feed();
-
-      if (millis() - start > 60000) {
-        Serial.println("failed to start FONA GPRS after 60 sec");
+    if (n == 0 || n == 2) {
+      
+      Serial.println(F("Wait for status n == 1"));
+      while ((n != 1) && (millis() - start < 600000)) {
+        
+        Serial.print("Giving modem 10 min (600 sec) to find network: "); Serial.println(600 - ((millis() - start) / 1000));
+        delay(2000);
+        watchdog_feed();
+        
+        n = fona.getNetworkStatus();
+        Serial.print("Network status: "); Serial.println(n);
+      }
+      if ((n != 1) && millis() - start > 600000) {
+        Serial.println("failed to find network after 600 sec, RESETTING");
+        // starve the watchdog
         while (true);
       }
     }
     
-    Serial.println("Enabled FONA GRPS");
-
-    gsmConnected = true;
+    if (n == 1) {
+      if (!fona.enableGPRS(false)) {
+        Serial.println(F("Failed to turn off. Probably fine - might've been off already."));
+      }
+      start = millis(); //reset the timer variable
+      while (!fona.enableGPRS(true)) {
+        delay(2000);
+        watchdog_feed();
+        Serial.println("Attempting fona.enableGPRS(true)");
+        if (millis() - start > 60000) {
+          Serial.println("failed to start FONA GPRS after 60 sec");
+          // Let the watchdog starve
+          while (true);
+        }
+      }
+      
+      Serial.println("Enabled FONA GRPS");
+  
+      gsmConnected = true;
+    }
   }
 
   bool _transmit(float temperature_f, float humidity, float heat_index, uint32_t current_time) {
@@ -150,14 +185,15 @@
       Serial.println("cannot send data - not configured");
       return false;
     }
-    uint32_t start = millis();
     
     if (!gsmConnected) connect_to_fona();
     watchdog_feed();
 
+    
     int transmit_attempts = 1;
     
     while (!fona_post(temperature_f, humidity, heat_index, current_time)) {
+      uint32_t start = millis();
       Serial.print("failed to POST, trying again... attempt #");
       Serial.println(transmit_attempts);
 
@@ -174,7 +210,7 @@
         watchdog_feed();
         
         if (millis() - start > 120000) {
-          Serial.println("failed to restart FONA GPRS after 120 sec");
+          Serial.println("failed to restart FONA GPRS inside fona_post retries after 120 sec");
           while (true);
         }
       }
